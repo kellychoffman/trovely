@@ -160,7 +160,7 @@ function Discover() {
 
       {founder?.isFounder && founder.siteSources > 0 ? (
         <div class="stack" style={{ marginBottom: "24px" }}>
-          <p class="small muted">{founder.siteSources} pins still link to kelly.blog. Point them at the original X posts instead.</p>
+          <p class="small muted">{founder.siteSources} pins still have no original link or point at kelly.blog. Point them at their original posts.</p>
           <div class="row">
             <button onClick={async () => {
               setSourceMsg("Updating…");

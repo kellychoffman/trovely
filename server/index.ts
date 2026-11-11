@@ -98,7 +98,7 @@ export default capsule({
       const founder = ctx.env.FOUNDER_USER_ID;
       const isFounder = Boolean(founder) && ctx.auth.userId === founder;
       const mine = founder ? await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", founder)).collect() : [];
-      const siteSources = mine.filter((m) => /kelly\.blog/.test(m.sourceUrl)).length;
+      const siteSources = mine.filter((m) => !m.sourceUrl || /kelly\.blog/.test(m.sourceUrl)).length;
       return { isFounder, count: mine.length, siteSources };
     }),
 
