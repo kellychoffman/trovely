@@ -1,7 +1,7 @@
 import { createClient, SignInWithSpacefast, signOut, storage, useAuth } from "@spacefast/zero/client";
 import { useEffect, useState } from "preact/hooks";
 import { css } from "./styles";
-import founderPins from "./founder-pins.json";
+import { founderPins } from "./founder-pins";
 import type app from "../server/index";
 
 const api = createClient<typeof app>();
@@ -163,7 +163,7 @@ function Discover() {
             <button onClick={async () => {
               setImportMsg("Importing…");
               try {
-                const pins = founderPins as { url: string; kind: string; mime: string; sourceUrl: string }[];
+                const pins = founderPins;
                 let added = 0;
                 for (let i = 0; i < pins.length; i += 100) {
                   added += await importPins({ items: pins.slice(i, i + 100) }) as number;
