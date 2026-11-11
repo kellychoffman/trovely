@@ -2,59 +2,58 @@
 
 Share inspiration. Upload photos and videos, tag them, group them into boards, and pin what you like from other people's uploads. Public uploads show up on **Discover**. Boards can be shared by link, like a mood board.
 
-- **Drag and drop** files anywhere on the site, or use the upload page.
-- **Let your agent upload.** Make an API token in your account and give it to your agent with the prompt from that page. The agent reads [`/llms.txt`](public/llms.txt) and uploads, tags and pins for you.
-- **Boards** group pins, carry a category and a description, and are private until you share them.
-- **Visibility.** Uploads are public (on Discover) or private. Private items never show on Discover or public boards.
+Trovely runs on [Spacefast Zero](https://spacefast.com/docs/zero-runtime/): a server capsule (`server/index.ts`) with MySQL tables and queries, plus a browser app (`client/index.tsx`). Files live in Spacefast object storage.
 
-## Run it
+## Features
 
-Requires Node 22.13 or newer (uses the built-in `node:sqlite`).
+- **Discover:** public uploads, newest first, filterable by tag and search.
+- **Upload:** drag and drop anywhere on the site, or use the upload page. Public or private.
+- **Boards:** group pins, add a category and description, and make them shareable by link. Private by default.
+- **Pins:** save anyone's public upload to a board. Without a board it lands in "Saved".
+- **Accounts:** Spacefast sign-in. Browsing needs no account; uploading, pinning and boards do.
+
+## Project layout
+
+```
+sf.jsonc            Spacefast project config (runtime: zero)
+server/index.ts     schema, queries, mutations
+client/index.tsx    the web app
+```
+
+## Run it locally
 
 ```bash
 npm install
-npm start          # http://localhost:3000
-npm test
+npm run check        # type-check
+npx spacefast dev --state-backend sqlite   # local Zero dev server
 ```
 
-Environment variables:
+The local dev server cannot make a signed-in identity, so uploads, pins and boards only work after the Space is published and you sign in on it.
 
-| Variable | Default | What it does |
-| --- | --- | --- |
-| `PORT` | `3000` | HTTP port |
-| `DATA_DIR` | `./data` | Holds `trovely.db` and uploaded files. Back this up. |
-| `COOKIE_SECURE` | unset | Set to `1` behind HTTPS so the session cookie is marked Secure |
-
-## Run it in a container
+## Publish
 
 ```bash
-docker build -t trovely .
-docker run -p 3000:3000 -v trovely-data:/data -e COOKIE_SECURE=1 trovely
+npm install -g spacefast
+sf login
+sf publish .
 ```
 
-The image has no build step beyond `npm ci`, so it runs on any host that runs Docker images.
+Publishing needs a Spacefast account. The first publish creates a Space and prints its live URL. Enable **Users** in the Space dashboard so sign-in works.
 
-## Layout
+## Limits to know about
 
-```
-src/app.js        Express routes (accounts, media, boards, pins)
-src/db.js         SQLite schema
-src/media.js      file-type sniffing, tag and URL cleanup
-src/auth.js       password hashing, session and token helpers
-public/           the web app (plain JS, no build step) and llms.txt for agents
-test/             API tests (node:test)
-```
+- **5 MB per upload.** Spacefast storage objects are capped at 5 MiB, so larger photos and most videos are refused. This is the main gap for video. Raising it would need a different storage host.
+- **Private means unlisted.** Private uploads stay off Discover and out of public boards. Their storage links are still public, so anyone with the link can open the file.
+- **No agent upload yet.** The earlier Express version had a bearer-token API for agents. That path is not ported yet. Agents can still use the web app once signed in.
+- **Dev identity is a guest.** Local `sf auth as` sets a guest, which cannot write. Test writes on a published Space.
 
-## Security notes
+## History
 
-- File types come from the file's bytes, not its name or the uploader's claimed type. Only images and videos in the allowlist are stored.
-- Files are renamed to random IDs. Filenames from uploaders never touch the disk.
-- Passwords are hashed with scrypt. Session cookies and API tokens are random; only their SHA-256 is stored.
-- "Private" hides an item from Discover and boards. Anyone who has a direct `/media/…` link can still open the file, because those names are unguessable. Treat them as unlisted, not secret.
+The original Express and SQLite version, with the bearer-token agent API, is in the git history before this commit.
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `npm test` before opening a PR, and keep new API behavior covered in `test/api.test.js`.
+Issues and pull requests are welcome. Run `npm run check` before opening a PR.
 
 ## License
 
