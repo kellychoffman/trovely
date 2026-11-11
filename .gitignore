@@ -5,3 +5,4 @@ node_modules/
 /.spacefast-*
 .spacefast/.spacefast-*
 .spacefast/.space-link-*.tmp
+.spacefast/
