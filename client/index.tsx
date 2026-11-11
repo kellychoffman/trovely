@@ -130,7 +130,7 @@ function shuffled<T>(list: T[]): T[] {
 
 function Discover() {
   const media = api.useQuery("discover") as Media[] | undefined;
-  const founder = api.useQuery("founderStatus") as { isFounder: boolean; count: number } | undefined;
+  const founder = api.useQuery("founderStatus") as { isFounder: boolean; count: number; signedIn: boolean; yourId: string | null } | undefined;
   const importPins = api.useMutation("importFounderPins");
   const [order, setOrder] = useState<string[]>([]);
   const [importMsg, setImportMsg] = useState("");
@@ -156,6 +156,9 @@ function Discover() {
         </div>
       </header>
 
+      {founder?.signedIn && !founder.isFounder ? (
+        <p class="small muted">Signed in, but not as the founder. Your ID here is {founder.yourId}.</p>
+      ) : null}
       {founder?.isFounder && founder.count < founderPins.length ? (
         <div class="stack" style={{ marginBottom: "24px" }}>
           <p class="small muted">Founder: import your kelly.blog pins to this board ({founder.count} of {founderPins.length} imported). They stay on kelly.blog.</p>
