@@ -112,4 +112,23 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
   .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .detail { grid-template-columns: 1fr; }
 }
+
+/* kelly.blog /inspiration board: square uncropped tiles, 5/3/1 columns, no captions. */
+.ib { max-width: 1280px; margin: 0 auto; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.ib-header { margin: 0 0 56px; }
+.ib-home { display: inline-block; margin: 0 0 8px; font-size: 13px; color: var(--muted); text-decoration: none; }
+.ib-home:hover, .ib-shuffle:hover { color: var(--fg); }
+.ib-line { display: flex; align-items: baseline; gap: 16px; }
+.ib-title { margin: 0; font-size: 28px; font-weight: 700; line-height: 1.25; }
+.ib-shuffle { margin-left: auto; font-size: 13px; color: var(--muted); text-decoration: none; }
+.ib-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.ib-pin { display: block; color: var(--muted); text-decoration: none; }
+.ib-tile { position: relative; aspect-ratio: 1 / 1; overflow: hidden; border: 1px solid transparent; }
+.ib-tile img, .ib-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.ib-pin:hover .ib-tile, .ib-pin:focus-visible .ib-tile { border-color: var(--line); }
+@media (max-width: 1000px) { .ib-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .ib-grid { grid-template-columns: minmax(0, 1fr); }
+  .ib-title { font-size: 22px; }
+}
 `;

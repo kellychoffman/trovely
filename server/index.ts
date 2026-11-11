@@ -85,26 +85,22 @@ export default capsule({
 
   // Guests can browse. Writing needs a signed-in account.
   queries: {
-    discover: query(async (ctx, args: { tag?: string; q?: string } = {}) => {
-      let rows = await ctx.db.media.withIndex("by_visibility", (r) => r.eq("visibility", PUBLIC)).take(300);
-      if (args.tag) {
-        const tag = normalizeTag(args.tag);
-        const tagged = await ctx.db.mediaTags.withIndex("by_tag", (r) => r.eq("tag", tag)).collect();
-        const ids = new Set(tagged.map((t) => t.media));
-        rows = rows.filter((m) => ids.has(m.id));
-      }
-      if (args.q) {
-        const needle = args.q.trim().toLowerCase();
-        const matching = [];
-        for (const m of rows) {
-          if (m.title.toLowerCase().includes(needle)) { matching.push(m); continue; }
-          const tags = await tagsFor(ctx, m.id);
-          if (tags.some((t) => t.includes(needle))) matching.push(m);
-        }
-        rows = matching;
-      }
-      rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      return withTags(ctx, rows.slice(0, 120));
+    // /discover is the founder's board: public pins owned by FOUNDER_USER_ID.
+    discover: query(async (ctx) => {
+      const founder = ctx.env.FOUNDER_USER_ID;
+      if (!founder) return [];
+      const rows = await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", founder)).collect();
+      return withTags(ctx, rows.filter((m) => m.visibility === PUBLIC));
+    }),
+
+    // Tells the founder's browser whether to offer the one-time import.
+    founderStatus: query(async (ctx) => {
+      const founder = ctx.env.FOUNDER_USER_ID;
+      const isFounder = Boolean(founder) && ctx.auth.userId === founder;
+      const count = founder
+        ? (await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", founder)).collect()).length
+        : 0;
+      return { isFounder, count };
     }),
 
     tagCounts: query(async (ctx) => {
@@ -165,6 +161,38 @@ export default capsule({
   },
 
   mutations: {
+    // One-time import of the founder's pins. Files stay on kelly.blog, so storageId is empty.
+    importFounderPins: mutation(async (ctx, args: {
+      items: { url: string; kind: string; mime: string; sourceUrl?: string }[];
+    }) => {
+      const { userId } = ctx.auth.requireSignedIn();
+      const founder = ctx.env.FOUNDER_USER_ID;
+      if (!founder || userId !== founder) throw new Error("Only the founder can import these.");
+      const existing = await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", userId)).collect();
+      const seen = new Set(existing.map((m) => m.url));
+      let added = 0;
+      for (const item of args.items.slice(0, 100)) {
+        if (!KINDS.includes(item.kind) || !/^https:\/\/kelly\.blog\//.test(item.url)) continue;
+        if (seen.has(item.url)) continue;
+        const sourceUrl = cleanUrl(item.sourceUrl) ?? "";
+        await ctx.db.media.insert({
+          owner: userId,
+          ownerName: "kelly",
+          kind: item.kind,
+          mime: item.mime,
+          storageId: "",
+          url: item.url,
+          title: "",
+          sourceUrl,
+          visibility: PUBLIC,
+        });
+        seen.add(item.url);
+        added += 1;
+      }
+      ctx.invalidate();
+      return added;
+    }),
+
     addMedia: mutation(async (ctx, args: {
       storageId: string; url: string; kind: string; mime: string;
       title?: string; sourceUrl?: string; visibility?: string; tags?: string[];

@@ -1,6 +1,7 @@
 import { createClient, SignInWithSpacefast, signOut, storage, useAuth } from "@spacefast/zero/client";
 import { useEffect, useState } from "preact/hooks";
 import { css } from "./styles";
+import founderPins from "./founder-pins.json";
 import type app from "../server/index";
 
 const api = createClient<typeof app>();
@@ -35,6 +36,7 @@ function parseRoute(hash: string): Route {
   if (first === "m" && second) return { name: "media", id: second };
   if (first === "b" && second) return { name: "board", id: second };
   if (first === "upload") return { name: "upload" };
+  if (first === "discover") return { name: "discover", tag: "", q: "" };
   if (first === "boards") return { name: "boards" };
   if (first === "account") return { name: "account" };
   return { name: "discover", tag: params.get("tag") ?? "", q: params.get("q") ?? "" };
@@ -116,36 +118,83 @@ function SignInPrompt({ message }: { message: string }) {
 
 // ---- pages ----------------------------------------------------------------
 
-function Discover({ tag, q }: { tag: string; q: string }) {
-  const media = api.useQuery("discover", { tag: tag || undefined, q: q || undefined }) as Media[] | undefined;
-  const tags = api.useQuery("tagCounts") as { tag: string; count: number }[] | undefined;
-  const [search, setSearch] = useState(q);
+// Shuffle like kelly.blog's /inspiration: a new random order on every visit.
+function shuffled<T>(list: T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function Discover() {
+  const media = api.useQuery("discover") as Media[] | undefined;
+  const founder = api.useQuery("founderStatus") as { isFounder: boolean; count: number } | undefined;
+  const importPins = api.useMutation("importFounderPins");
+  const [order, setOrder] = useState<string[]>([]);
+  const [importMsg, setImportMsg] = useState("");
+  const ids = (media ?? []).map((m) => m.id).join(",");
+
+  useEffect(() => {
+    setOrder(shuffled((media ?? []).map((m) => m.id)));
+  }, [ids]);
+
+  const byId = new Map((media ?? []).map((m) => [m.id, m]));
+  const items = order.map((id) => byId.get(id)).filter(Boolean) as Media[];
 
   return (
-    <>
-      <Dropzone onFiles={startUpload} label="Drop photos or videos here, or choose files" />
-      <form class="row" style={{ marginTop: "8px" }} onSubmit={(e: any) => {
-        e.preventDefault();
-        const value = search.trim();
-        location.hash = value ? `#/?q=${encodeURIComponent(value)}` : "#/";
-      }}>
-        <input value={search} placeholder="search titles and tags" onInput={(e: any) => setSearch(e.currentTarget.value)} />
-        <button class="ghost">search</button>
-      </form>
-      <div class="chips">
-        <a class={tag ? "chip" : "chip on"} href="#/">all</a>
-        {(tags ?? []).slice(0, 40).map((t) => (
-          <a key={t.tag} class={t.tag === tag ? "chip on" : "chip"} href={`#/?tag=${encodeURIComponent(t.tag)}`}>
-            {t.tag} {t.count}
-          </a>
-        ))}
-      </div>
+    <div class="ib">
+      <header class="ib-header">
+        <a class="ib-home" href="https://kelly.blog/">kelly.blog</a>
+        <div class="ib-line">
+          <h1 class="ib-title">Inspiration ✶</h1>
+          <a class="ib-shuffle" href="#/discover" onClick={(e: any) => {
+            e.preventDefault();
+            setOrder(shuffled(order));
+          }}>Shuffle</a>
+        </div>
+      </header>
+
+      {founder?.isFounder && founder.count === 0 ? (
+        <div class="stack" style={{ marginBottom: "24px" }}>
+          <p class="small muted">Founder: import your 333 kelly.blog pins to this board. They stay on kelly.blog.</p>
+          <div class="row">
+            <button onClick={async () => {
+              setImportMsg("Importing…");
+              try {
+                const pins = founderPins as { url: string; kind: string; mime: string; sourceUrl: string }[];
+                let added = 0;
+                for (let i = 0; i < pins.length; i += 100) {
+                  added += await importPins({ items: pins.slice(i, i + 100) }) as number;
+                  setImportMsg(`Imported ${Math.min(i + 100, pins.length)} of ${pins.length}…`);
+                }
+                setImportMsg(`Done: ${added} pins added.`);
+              } catch (ex: any) { setImportMsg(ex.message); }
+            }}>import founder pins</button>
+          </div>
+          <p class="small muted">{importMsg}</p>
+        </div>
+      ) : null}
+
       {media === undefined
         ? <p class="muted">Loading…</p>
-        : media.length
-          ? <Grid items={media} />
-          : <p class="muted">Nothing here yet. Be the first to upload.</p>}
-    </>
+        : items.length
+          ? (
+            <div class="ib-grid">
+              {items.map((m) => (
+                <a key={m.id} class="ib-pin" href={`#/m/${m.id}`}>
+                  <div class="ib-tile">
+                    {m.kind === "video"
+                      ? <video src={m.url} muted loop autoPlay playsInline preload="metadata" />
+                      : <img src={m.url} loading="lazy" alt="" />}
+                  </div>
+                </a>
+              ))}
+            </div>
+          )
+          : <p class="muted">Nothing on the board yet.</p>}
+    </div>
   );
 }
 
@@ -484,7 +533,7 @@ function App() {
     case "boards": page = <Boards />; break;
     case "board": page = <BoardPage id={route.id} />; break;
     case "account": page = <Account />; break;
-    default: page = <Discover tag={route.tag} q={route.q} />;
+    default: page = <Discover />;
   }
 
   return (
