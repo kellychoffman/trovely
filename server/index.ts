@@ -317,6 +317,14 @@ export default capsule({
       ctx.invalidate();
     }),
 
+    // Save several pins to a board in one call.
+    addManyToBoard: mutation(async (ctx, args: { boardId: string; mediaIds: string[] }) => {
+      for (const mediaId of (args.mediaIds ?? []).slice(0, 500)) {
+        await addLink(ctx, args.boardId, mediaId);
+      }
+      return (args.mediaIds ?? []).length;
+    }),
+
     addToBoard: mutation(async (ctx, args: { boardId: string; mediaId: string }) => {
       await addLink(ctx, args.boardId, args.mediaId);
     }),

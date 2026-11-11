@@ -131,4 +131,13 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
   .ib-grid { grid-template-columns: minmax(0, 1fr); }
   .ib-title { font-size: 22px; }
 }
+
+/* Multi-select on the board */
+.ib-pick { background: none; border: 0; padding: 0; margin: 0; width: 100%; font: inherit; color: inherit; text-align: inherit; cursor: pointer; display: block; }
+.ib-pin.selected .ib-tile { outline: 3px solid var(--fg); outline-offset: -3px; }
+.ib-pin.selected .ib-tile::after { content: "\\2713"; position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; line-height: 24px; text-align: center; background: var(--fg); color: var(--bg); font-size: 14px; z-index: 1; }
+.ib-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; background: var(--bg); border-top: 1px solid var(--line); z-index: 5; font-size: 14px; }
+.ib-bar span { margin-right: 4px; }
+.ib-bar input, .ib-bar select { max-width: 200px; padding: 6px 8px; }
+.ib-grid { padding-bottom: 96px; }
 `;

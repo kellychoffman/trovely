@@ -133,9 +133,14 @@ function Discover() {
   const founder = api.useQuery("founderStatus") as { isFounder: boolean; count: number; siteSources: number } | undefined;
   const importPins = api.useMutation("importFounderPins");
   const updateSources = api.useMutation("updateFounderSources");
-  const [sourceMsg, setSourceMsg] = useState("");
+  const createBoard = api.useMutation("createBoard");
+  const addManyToBoard = api.useMutation("addManyToBoard");
   const [order, setOrder] = useState<string[]>([]);
   const [importMsg, setImportMsg] = useState("");
+  const [sourceMsg, setSourceMsg] = useState("");
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
   const ids = (media ?? []).map((m) => m.id).join(",");
 
   useEffect(() => {
@@ -144,6 +149,16 @@ function Discover() {
 
   const byId = new Map((media ?? []).map((m) => [m.id, m]));
   const items = order.map((id) => byId.get(id)).filter(Boolean) as Media[];
+
+  function toggle(id: string) {
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected([]);
+    setSaving(false);
+  }
 
   return (
     <div class="ib">
@@ -155,28 +170,13 @@ function Discover() {
             e.preventDefault();
             setOrder(shuffled(order));
           }}>Shuffle</a>
+          <a class="ib-shuffle" href="#/discover" onClick={(e: any) => {
+            e.preventDefault();
+            if (selecting) stopSelecting(); else setSelecting(true);
+          }}>{selecting ? "Cancel" : "Select"}</a>
         </div>
       </header>
 
-      {founder?.isFounder && founder.siteSources > 0 ? (
-        <div class="stack" style={{ marginBottom: "24px" }}>
-          <p class="small muted">{founder.siteSources} pins still have no source link. Point them at their original posts.</p>
-          <div class="row">
-            <button onClick={async () => {
-              setSourceMsg("Updating…");
-              try {
-                let done = 0;
-                for (let i = 0; i < founderPins.length; i += 100) {
-                  const items = founderPins.slice(i, i + 100).map((p) => ({ url: p.url, sourceUrl: p.sourceUrl }));
-                  done += await updateSources({ items }) as number;
-                }
-                setSourceMsg(`Updated ${done} pins.`);
-              } catch (ex: any) { setSourceMsg(ex.message); }
-            }}>update pin sources</button>
-          </div>
-          <p class="small muted">{sourceMsg}</p>
-        </div>
-      ) : null}
       {founder?.isFounder && founder.count < founderPins.length ? (
         <div class="stack" style={{ marginBottom: "24px" }}>
           <p class="small muted">Founder: import your kelly.blog pins to this board ({founder.count} of {founderPins.length} imported). They stay on kelly.blog.</p>
@@ -184,11 +184,10 @@ function Discover() {
             <button onClick={async () => {
               setImportMsg("Importing…");
               try {
-                const pins = founderPins;
                 let added = 0;
-                for (let i = 0; i < pins.length; i += 100) {
-                  added += await importPins({ items: pins.slice(i, i + 100) }) as number;
-                  setImportMsg(`Imported ${Math.min(i + 100, pins.length)} of ${pins.length}…`);
+                for (let i = 0; i < founderPins.length; i += 100) {
+                  added += await importPins({ items: founderPins.slice(i, i + 100) }) as number;
+                  setImportMsg(`Imported ${Math.min(i + 100, founderPins.length)} of ${founderPins.length}…`);
                 }
                 setImportMsg(`Done: ${added} pins added.`);
               } catch (ex: any) { setImportMsg(ex.message); }
@@ -198,23 +197,120 @@ function Discover() {
         </div>
       ) : null}
 
+      {founder?.isFounder && founder.siteSources > 0 ? (
+        <div class="stack" style={{ marginBottom: "24px" }}>
+          <p class="small muted">{founder.siteSources} pins have no source link. Point them at their original posts.</p>
+          <div class="row">
+            <button onClick={async () => {
+              setSourceMsg("Updating…");
+              try {
+                let done = 0;
+                for (let i = 0; i < founderPins.length; i += 100) {
+                  const batch = founderPins.slice(i, i + 100).map((p) => ({ url: p.url, sourceUrl: p.sourceUrl }));
+                  done += await updateSources({ items: batch }) as number;
+                }
+                setSourceMsg(`Updated ${done} pins.`);
+              } catch (ex: any) { setSourceMsg(ex.message); }
+            }}>update pin sources</button>
+          </div>
+          <p class="small muted">{sourceMsg}</p>
+        </div>
+      ) : null}
+
       {media === undefined
         ? <p class="muted">Loading…</p>
         : items.length
           ? (
             <div class="ib-grid">
-              {items.map((m) => (
-                <a key={m.id} class="ib-pin" href={`#/m/${m.id}`}>
+              {items.map((m) => {
+                const isSelected = selected.includes(m.id);
+                const body = (
                   <div class="ib-tile">
                     {m.kind === "video"
                       ? <video src={m.url} muted loop autoPlay playsInline preload="metadata" />
                       : <img src={m.url} loading="lazy" alt="" />}
                   </div>
-                </a>
-              ))}
+                );
+                return selecting ? (
+                  <button key={m.id} type="button" class={isSelected ? "ib-pin ib-pick selected" : "ib-pin ib-pick"}
+                    onClick={() => toggle(m.id)}>{body}</button>
+                ) : (
+                  <a key={m.id} class="ib-pin" href={`#/m/${m.id}`}>{body}</a>
+                );
+              })}
             </div>
           )
           : <p class="muted">Nothing on the board yet.</p>}
+
+      {selecting ? (
+        <SavePanel
+          count={selected.length}
+          saving={saving}
+          onSave={async (target: { boardId?: string; name?: string; visibility?: string }) => {
+            setSaving(true);
+            try {
+              let boardId = target.boardId;
+              if (!boardId) boardId = await createBoard({ name: target.name ?? "", visibility: target.visibility ?? "private" }) as string;
+              await addManyToBoard({ boardId, mediaIds: selected });
+              location.hash = `#/b/${boardId}`;
+            } catch (ex: any) {
+              setSaving(false);
+              throw ex;
+            }
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// Bottom bar while selecting: pick an existing board or name a new one.
+function SavePanel({ count, saving, onSave }: {
+  count: number;
+  saving: boolean;
+  onSave: (target: { boardId?: string; name?: string; visibility?: string }) => Promise<void>;
+}) {
+  const { isSignedIn } = useAuth();
+  const boards = api.useQuery("myBoards") as { id: string; name: string }[] | undefined;
+  const [target, setTarget] = useState("new");
+  const [name, setName] = useState("");
+  const [visibility, setVisibility] = useState("public");
+  const [msg, setMsg] = useState("");
+
+  if (!isSignedIn) {
+    return (
+      <div class="ib-bar">
+        <span>{count} selected</span>
+        <SignInWithSpacefast />
+      </div>
+    );
+  }
+
+  return (
+    <div class="ib-bar">
+      <span>{count} selected</span>
+      <select value={target} onChange={(e: any) => setTarget(e.currentTarget.value)}>
+        <option value="new">New board…</option>
+        {(boards ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+      </select>
+      {target === "new" ? (
+        <>
+          <input value={name} placeholder="board name" onInput={(e: any) => setName(e.currentTarget.value)} />
+          <select value={visibility} onChange={(e: any) => setVisibility(e.currentTarget.value)}>
+            <option value="public">shareable</option>
+            <option value="private">private</option>
+          </select>
+        </>
+      ) : null}
+      <button disabled={saving || count === 0 || (target === "new" && !name.trim())} onClick={async () => {
+        setMsg("");
+        try {
+          await onSave(target === "new"
+            ? { name: name.trim(), visibility }
+            : { boardId: target });
+        } catch (ex: any) { setMsg(ex.message); }
+      }}>{saving ? "saving…" : "save"}</button>
+      <span class="small error">{msg}</span>
     </div>
   );
 }
