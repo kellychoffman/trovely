@@ -156,9 +156,9 @@ function Discover() {
         </div>
       </header>
 
-      {founder?.isFounder && founder.count === 0 ? (
+      {founder?.isFounder && founder.count < founderPins.length ? (
         <div class="stack" style={{ marginBottom: "24px" }}>
-          <p class="small muted">Founder: import your 333 kelly.blog pins to this board. They stay on kelly.blog.</p>
+          <p class="small muted">Founder: import your kelly.blog pins to this board ({founder.count} of {founderPins.length} imported). They stay on kelly.blog.</p>
           <div class="row">
             <button onClick={async () => {
               setImportMsg("Importing…");
