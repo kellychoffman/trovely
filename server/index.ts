@@ -100,8 +100,7 @@ export default capsule({
       const count = founder
         ? (await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", founder)).collect()).length
         : 0;
-      // yourId lets the founder copy the ID the Space sees, to set FOUNDER_USER_ID.
-      return { isFounder, count, signedIn: ctx.auth.isSignedIn === true, yourId: ctx.auth.userId ?? null };
+      return { isFounder, count };
     }),
 
     tagCounts: query(async (ctx) => {
