@@ -1,5 +1,6 @@
 import { createClient, SignInWithSpacefast, signOut, storage, useAuth } from "@spacefast/zero/client";
 import { useEffect, useState } from "preact/hooks";
+import { css } from "./styles";
 import type app from "../server/index";
 
 const api = createClient<typeof app>();
@@ -488,6 +489,7 @@ function App() {
 
   return (
     <>
+      <style>{css}</style>
       <header class="top">
         <a class="wordmark" href="#/">trovely</a>
         <nav>

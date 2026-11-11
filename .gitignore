@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+.spacefast/state.json
+/.spacefast-*
+.spacefast/.spacefast-*
+.spacefast/.space-link-*.tmp
