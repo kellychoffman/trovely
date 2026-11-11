@@ -130,8 +130,10 @@ function shuffled<T>(list: T[]): T[] {
 
 function Discover() {
   const media = api.useQuery("discover") as Media[] | undefined;
-  const founder = api.useQuery("founderStatus") as { isFounder: boolean; count: number } | undefined;
+  const founder = api.useQuery("founderStatus") as { isFounder: boolean; count: number; siteSources: number } | undefined;
   const importPins = api.useMutation("importFounderPins");
+  const updateSources = api.useMutation("updateFounderSources");
+  const [sourceMsg, setSourceMsg] = useState("");
   const [order, setOrder] = useState<string[]>([]);
   const [importMsg, setImportMsg] = useState("");
   const ids = (media ?? []).map((m) => m.id).join(",");
@@ -156,6 +158,25 @@ function Discover() {
         </div>
       </header>
 
+      {founder?.isFounder && founder.siteSources > 0 ? (
+        <div class="stack" style={{ marginBottom: "24px" }}>
+          <p class="small muted">{founder.siteSources} pins still link to kelly.blog. Point them at the original X posts instead.</p>
+          <div class="row">
+            <button onClick={async () => {
+              setSourceMsg("Updating…");
+              try {
+                let done = 0;
+                for (let i = 0; i < founderPins.length; i += 100) {
+                  const items = founderPins.slice(i, i + 100).map((p) => ({ url: p.url, sourceUrl: p.sourceUrl }));
+                  done += await updateSources({ items }) as number;
+                }
+                setSourceMsg(`Updated ${done} pins.`);
+              } catch (ex: any) { setSourceMsg(ex.message); }
+            }}>update pin sources</button>
+          </div>
+          <p class="small muted">{sourceMsg}</p>
+        </div>
+      ) : null}
       {founder?.isFounder && founder.count < founderPins.length ? (
         <div class="stack" style={{ marginBottom: "24px" }}>
           <p class="small muted">Founder: import your kelly.blog pins to this board ({founder.count} of {founderPins.length} imported). They stay on kelly.blog.</p>

@@ -97,10 +97,9 @@ export default capsule({
     founderStatus: query(async (ctx) => {
       const founder = ctx.env.FOUNDER_USER_ID;
       const isFounder = Boolean(founder) && ctx.auth.userId === founder;
-      const count = founder
-        ? (await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", founder)).collect()).length
-        : 0;
-      return { isFounder, count };
+      const mine = founder ? await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", founder)).collect() : [];
+      const siteSources = mine.filter((m) => /kelly\.blog/.test(m.sourceUrl)).length;
+      return { isFounder, count: mine.length, siteSources };
     }),
 
     tagCounts: query(async (ctx) => {
@@ -191,6 +190,25 @@ export default capsule({
       }
       ctx.invalidate();
       return added;
+    }),
+
+    // One-time fix: point founder pins at their original source instead of kelly.blog.
+    updateFounderSources: mutation(async (ctx, args: { items: { url: string; sourceUrl: string }[] }) => {
+      const { userId } = ctx.auth.requireSignedIn();
+      const founder = ctx.env.FOUNDER_USER_ID;
+      if (!founder || userId !== founder) throw new Error("Only the founder can change these.");
+      const mine = await ctx.db.media.withIndex("by_owner", (r) => r.eq("owner", userId)).collect();
+      const byUrl = new Map(mine.map((m) => [m.url, m]));
+      let updated = 0;
+      for (const item of args.items.slice(0, 100)) {
+        const row = byUrl.get(item.url);
+        const sourceUrl = cleanUrl(item.sourceUrl);
+        if (!row || sourceUrl === null) continue;
+        await ctx.db.media.update(row.id, { sourceUrl });
+        updated += 1;
+      }
+      ctx.invalidate();
+      return updated;
     }),
 
     addMedia: mutation(async (ctx, args: {
